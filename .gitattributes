@@ -76,7 +76,7 @@ docker-compose*.yml text eol=lf
 # Exclude files that should not be committed
 .env export-ignore
 .env.* export-ignore
-\!.env.example
+\!.env.example export-ignore
 
 # Exclude IDE specific files
 .idea/ export-ignore
@@ -103,7 +103,7 @@ htmlcov/ export-ignore
 
 # Exclude local data
 data/ export-ignore
-!data/example/ export-ignore
+\!data/example/ export-ignore
 
 # Exclude Jupyter Notebook checkpoints
 .ipynb_checkpoints/ export-ignore
