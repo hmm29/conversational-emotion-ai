@@ -76,7 +76,7 @@ docker-compose*.yml text eol=lf
 # Exclude files that should not be committed
 .env export-ignore
 .env.* export-ignore
-!.env.example
+\!.env.example
 
 # Exclude IDE specific files
 .idea/ export-ignore
