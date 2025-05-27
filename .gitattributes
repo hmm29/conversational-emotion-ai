@@ -1,0 +1,109 @@
+# Set default behavior for all files
+* text=auto eol=lf
+
+# Binary files should not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
+*.eot binary
+*.otf binary
+*.svg binary
+
+# Ensure Windows scripts work
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Ensure shell scripts work
+*.sh text eol=lf
+*.bash text eol=lf
+
+# Python files
+*.py text eol=lf
+*.pyi text eol=lf
+*.pxd text eol=lf
+*.pxi text eol=lf
+*.pyd binary
+*.so binary
+*.pyd binary
+
+# YAML files
+*.yaml text eol=lf
+*.yml text eol=lf
+
+# JSON files
+*.json text eol=lf
+
+# Markdown files
+*.md text eol=lf
+
+# Text files
+*.txt text eol=lf
+*.csv text eol=lf
+*.tsv text eol=lf
+*.rst text eol=lf
+*.md text eol=lf
+
+# Config files
+*.ini text eol=lf
+*.cfg text eol=lf
+*.conf text eol=lf
+*.toml text eol=lf
+
+# Git files
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.gitmodules text eol=lf
+
+# Editor files
+.editorconfig text eol=lf
+
+# Docker files
+Dockerfile* text eol=lf
+docker-compose*.yml text eol=lf
+
+# Documentation
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+
+# Exclude files that should not be committed
+.env export-ignore
+.env.* export-ignore
+!.env.example
+
+# Exclude IDE specific files
+.idea/ export-ignore
+.vscode/ export-ignore
+*.sublime-workspace export-ignore
+*.sublime-project export-ignore
+
+# Exclude build and distribution directories
+build/ export-ignore
+dist/ export-ignore
+*.egg-info/ export-ignore
+
+# Exclude virtual environment
+venv/ export-ignore
+env/ export-ignore
+ENV/ export-ignore
+.venv/ export-ignore
+
+# Exclude test and coverage files
+.coverage export-ignore
+htmlcov/ export-ignore
+.pytest_cache/ export-ignore
+.mypy_cache/ export-ignore
+
+# Exclude local data
+data/ export-ignore
+!data/example/ export-ignore
+
+# Exclude Jupyter Notebook checkpoints
+.ipynb_checkpoints/ export-ignore

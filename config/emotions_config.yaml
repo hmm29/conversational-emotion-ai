@@ -1,0 +1,112 @@
+# Emotion configuration for the Conversational Emotion AI
+
+# List of primary emotions to detect and analyze
+primary_emotions:
+  - name: "joy"
+    description: "Feeling of pleasure, happiness, and delight"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "sadness"
+    description: "Feeling of sorrow, unhappiness, or grief"
+    positive: false
+    intensity_threshold: 0.3
+    
+  - name: "anger"
+    description: "Strong feeling of annoyance, displeasure, or hostility"
+    positive: false
+    intensity_threshold: 0.25
+    
+  - name: "fear"
+    description: "Unpleasant emotion caused by the threat of danger, pain, or harm"
+    positive: false
+    intensity_threshold: 0.25
+    
+  - name: "surprise"
+    description: "Feeling of mild astonishment or shock caused by something unexpected"
+    positive: null  # Can be positive or negative depending on context
+    intensity_threshold: 0.3
+    
+  - name: "disgust"
+    description: "Feeling of revulsion or strong disapproval"
+    positive: false
+    intensity_threshold: 0.25
+
+# Emotion response strategies
+response_strategies:
+  # General approach for positive emotions
+  positive_emotions:
+    - "Acknowledge and validate the positive emotion"
+    - "Express shared enthusiasm when appropriate"
+    - "Encourage and support the positive state"
+    
+  # General approach for negative emotions
+  negative_emotions:
+    - "Acknowledge the emotion with empathy"
+    - "Avoid dismissing or minimizing the feeling"
+    - "Offer support and understanding"
+    - "Suggest constructive ways to cope when appropriate"
+
+# Emotion-specific response guidance
+emotion_guidance:
+  joy:
+    - "Match the user's enthusiasm"
+    - "Celebrate their positive feelings"
+    - "Encourage sharing more about what's making them happy"
+    
+  sadness:
+    - "Express empathy and understanding"
+    - "Offer comforting words"
+    - "Avoid being overly cheerful or dismissive"
+    - "Ask if they'd like to talk about what's bothering them"
+    
+  anger:
+    - "Remain calm and composed"
+    - "Acknowledge their frustration"
+    - "Avoid being defensive or confrontational"
+    - "Help them articulate the source of their anger"
+    
+  fear:
+    - "Provide reassurance"
+    - "Acknowledge the validity of their concerns"
+    - "Offer information or perspective if helpful"
+    - "Help them feel safe and supported"
+    
+  surprise:
+    - "Acknowledge the unexpected nature of the situation"
+    - "Help process the surprise"
+    - "Adjust tone based on whether the surprise is positive or negative"
+    
+  disgust:
+    - "Acknowledge their reaction"
+    - "Avoid judgment"
+    - "Help them process the source of disgust"
+
+# Emotion intensity levels
+intensity_levels:
+  - level: 1
+    range: [0.0, 0.3]
+    description: "Mild"
+    
+  - level: 2
+    range: [0.31, 0.6]
+    description: "Moderate"
+    
+  - level: 3
+    range: [0.61, 0.8]
+    description: "Strong"
+    
+  - level: 4
+    range: [0.81, 1.0]
+    description: "Very Strong"
+
+# Default settings
+defaults:
+  top_emotions_to_show: 3
+  emotion_display_threshold: 0.1  # Minimum score to display an emotion
+  emotion_update_frequency: 5  # Update emotion analysis every N messages
+  max_emotion_history: 100  # Maximum number of emotion states to track
+
+# Version control
+version: "1.0.0"
+last_updated: "2023-10-26"
