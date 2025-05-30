@@ -1,11 +1,9 @@
 # System Architecture
 
 ## Overview
-
-The Conversational Emotion AI is a sophisticated system that combines natural language processing with emotion analysis to create empathetic and context-aware conversations. The architecture is designed to be modular, scalable, and maintainable.
+The Conversational Emotion AI is a sophisticated enterprise-grade application that combines advanced natural language processing with emotion analysis to create empathetic and context-aware conversations. The architecture is designed to be modular, scalable, and maintainable.
 
 ## High-Level Architecture
-
 ```mermaid
 graph TD
     A[User] -->|Text Input| B[Streamlit UI]
@@ -21,7 +19,14 @@ graph TD
         D -->|API Call| F[Hume AI]
         E -->|API Call| G[OpenAI]
     end
-```
+    
+    subgraph Internal Services
+        C --> H[Performance Monitor]
+        H -->|Metrics| I[Observability]
+        C --> J[Cache Manager]
+        J -->|Cached Data| C
+    end
+````
 
 ## Core Components
 
@@ -53,22 +58,24 @@ graph TD
 - `Message`: Data class for message representation
 
 **Dependencies**:
-- None (pure Python)
+- Redis (optional) for persistent storage
+- SQLite (optional) for local storage
 
 ### 3. Response Generator
 
 **Responsibilities**:
-- Generate contextually appropriate responses
-- Incorporate emotional context into responses
-- Handle conversation flow and coherence
-- Manage API interactions with OpenAI
+- Generate appropriate responses based on conversation context and emotions
+- Maintain personality consistency
+- Handle conversation branching
+- Manage response formatting
 
 **Key Classes**:
-- `ResponseGenerator`: Handles response generation logic
+- `ResponseGenerator`: Main class for response generation
+- `PersonalityProfile`: Manages AI personality traits
 
 **Dependencies**:
-- OpenAI API
-- `openai` Python package
+- OpenAI GPT-4 API
+- `httpx` for async HTTP requests
 
 ### 4. Web Interface (Streamlit)
 
