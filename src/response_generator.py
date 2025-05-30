@@ -2,55 +2,236 @@
 Response Generator Module
 
 This module handles generating contextually appropriate and emotionally aware responses
-using OpenAI's API.
+using OpenAI's API with psychology-informed prompting.
 """
-import os
-from typing import List, Dict, Any, Optional
 import openai
-from dotenv import load_dotenv
+import os
+from typing import Dict, List, Optional, Any
+from dataclasses import dataclass
+from datetime import datetime
+import logging
+import asyncio
+import yaml
 
-load_dotenv()
+from .emotion_analyzer import EmotionResult, EmotionHistory
 
-class ResponseGenerator:
-    """Generates responses using OpenAI's API with emotional context awareness."""
+logger = logging.getLogger(__name__)
+
+@dataclass
+class ConversationContext:
+    """Context for maintaining conversation state"""
+    user_message: str
+    emotion_result: EmotionResult
+    conversation_history: List[Dict[str, Any]]
+    emotion_trend: Dict[str, float]
+    user_personality_profile: Dict[str, Any]
     
-    def __init__(self, api_key: Optional[str] = None, model: str = "gpt-4"):
-        """Initialize the ResponseGenerator with API credentials.
-        
-        Args:
-            api_key: OpenAI API key. If not provided, will try to load from environment.
-            model: The OpenAI model to use for response generation.
-        """
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+class EmotionAwareResponseGenerator:
+    """
+    Advanced response generator that creates emotionally-intelligent responses
+    using OpenAI's GPT models with psychology-informed prompting
+    """
+    
+    def __init__(self, api_key: str, model: str = "gpt-4"):
+        self.client = openai.AsyncOpenAI(api_key=api_key)
         self.model = model
         
-        if not self.api_key:
-            raise ValueError("OpenAI API key not provided and not found in environment variables")
-            
-        openai.api_key = self.api_key
+        # Load response strategies from config
+        self.load_response_strategies()
+        
+        # Initialize personality tracking
+        self.user_profiles = {}
+        
+    def load_response_strategies(self):
+        """Load emotion-based response strategies from config"""
+        try:
+            with open('config/emotions_config.yaml', 'r') as file:
+                config = yaml.safe_load(file)
+                self.response_strategies = config.get('response_strategies', {})
+                self.conversation_config = config.get('conversation', {})
+        except Exception as e:
+            logger.error(f"Error loading config: {e}")
+            self.response_strategies = self._default_strategies()
+            self.conversation_config = {}
     
-    def _build_system_prompt(self, emotion_context: Optional[Dict[str, float]] = None) -> str:
-        """Build the system prompt with emotional context.
+    def _default_strategies(self):
+        """Default response strategies if config fails to load"""
+        return {
+            'high_positive': {
+                'threshold': 0.7,
+                'emotions': ['joy', 'excitement', 'amusement', 'enthusiasm'],
+                'approach': 'amplify_positive'
+            },
+            'moderate_positive': {
+                'threshold': 0.4,
+                'emotions': ['contentment', 'interest', 'satisfaction'],
+                'approach': 'gentle_encouragement'
+            },
+            'negative': {
+                'threshold': 0.3,
+                'emotions': ['sadness', 'anger', 'fear', 'disappointment', 'shame'],
+                'approach': 'empathetic_support'
+            },
+            'neutral': {
+                'threshold': 0.2,
+                'emotions': ['doubt', 'tiredness'],
+                'approach': 'balanced_engagement'
+            }
+        }
+    
+    async def generate_response(self, context: ConversationContext) -> str:
+        """
+        Generate emotionally-aware response based on conversation context
         
         Args:
-            emotion_context: Dictionary of emotion scores for the user's message.
+            context: Complete conversation context including emotions
             
         Returns:
-            A formatted system prompt string.
+            Generated response string
         """
-        base_prompt = """You are an emotionally intelligent AI assistant. Your goal is to have natural, 
-        empathetic conversations while being helpful and informative. Pay attention to the emotional 
-        context of the conversation and respond appropriately."""
-        
-        if not emotion_context:
-            return base_prompt
+        try:
+            # Determine response strategy
+            strategy = self._determine_response_strategy(context.emotion_result)
             
-        # Sort emotions by score in descending order
-        sorted_emotions = sorted(
-            emotion_context.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )
+            # Build system prompt
+            system_prompt = self._build_system_prompt(strategy, context)
+            
+            # Build conversation history for context
+            messages = self._build_message_history(context, system_prompt)
+            
+            # Generate response
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self._get_temperature_for_strategy(strategy),
+                max_tokens=200,
+                presence_penalty=0.1,
+                frequency_penalty=0.1
+            )
+            
+            return response.choices[0].message.content.strip()
+            
+        except Exception as e:
+            logger.error(f"Error generating response: {e}")
+            return self._fallback_response(context.emotion_result)
+    
+    def _determine_response_strategy(self, emotion_result: EmotionResult) -> str:
+        """Determine appropriate response strategy based on emotions"""
+        dominant_emotion = emotion_result.dominant_emotion
+        confidence = emotion_result.confidence
+        
+        # Check each strategy category
+        for strategy_name, strategy_config in self.response_strategies.items():
+            if (dominant_emotion in strategy_config.get('emotions', []) and 
+                confidence >= strategy_config.get('threshold', 0.3)):
+                return strategy_name
+        
+        return 'balanced_engagement'  # Default strategy
+    
+    def _build_system_prompt(self, strategy: str, context: ConversationContext) -> str:
+        """Build psychology-informed system prompt based on strategy"""
+        base_prompt = """You are an emotionally intelligent AI assistant designed to have natural, 
+        empathetic conversations. You have been trained to understand and respond appropriately to 
+        human emotions based on psychological research in human-computer interaction."""
+        
+        strategy_prompts = {
+            'amplify_positive': """
+            The user is experiencing positive emotions (joy, excitement, amusement). Your approach should:
+            - Mirror their positive energy appropriately
+            - Encourage and validate their feelings
+            - Ask follow-up questions to maintain engagement
+            - Use enthusiastic but not overwhelming language
+            - Share in their positivity without being fake
+            """,
+            
+            'gentle_encouragement': """
+            The user is in a mildly positive or content state. Your approach should:
+            - Provide gentle encouragement and support
+            - Maintain a warm, friendly tone
+            - Show genuine interest in their thoughts
+            - Help build on their positive momentum
+            - Be supportive without being overly enthusiastic
+            """,
+            
+            'empathetic_support': """
+            The user is experiencing negative emotions (sadness, anger, fear). Your approach should:
+            - Show genuine empathy and understanding
+            - Validate their feelings without trying to "fix" everything immediately
+            - Use supportive, calming language
+            - Offer to listen and understand more
+            - Avoid being dismissive or overly cheerful
+            - Focus on being present and supportive
+            """,
+            
+            'balanced_engagement': """
+            The user's emotional state is neutral or unclear. Your approach should:
+            - Maintain a balanced, friendly tone
+            - Show interest in understanding them better
+            - Ask thoughtful questions to engage them
+            - Be responsive to emotional cues in their responses
+            - Stay flexible and adaptive to their needs
+            """
+        }
+        
+        emotion_context = f"""
+        Current emotion analysis:
+        - Dominant emotion: {context.emotion_result.dominant_emotion}
+        - Confidence: {context.emotion_result.confidence:.2f}
+        - Recent emotional trend: {self._format_emotion_trend(context.emotion_trend)}
+        """
+        
+        return f"{base_prompt}\n\n{strategy_prompts.get(strategy, strategy_prompts['balanced_engagement'])}\n\n{emotion_context}"
+    
+    def _build_message_history(self, context: ConversationContext, system_prompt: str) -> List[Dict[str, str]]:
+        """Build message history for OpenAI API"""
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # Add recent conversation history (last 6 exchanges to maintain context)
+        recent_history = context.conversation_history[-6:] if context.conversation_history else []
+        
+        for exchange in recent_history:
+            messages.append({"role": "user", "content": exchange.get('user', '')})
+            messages.append({"role": "assistant", "content": exchange.get('bot', '')})
+        
+        # Add current user message
+        messages.append({"role": "user", "content": context.user_message})
+        
+        return messages
+    
+    def _get_temperature_for_strategy(self, strategy: str) -> float:
+        """Get appropriate temperature setting for response strategy"""
+        temperature_map = {
+            'amplify_positive': 0.8,      # More creative and enthusiastic
+            'gentle_encouragement': 0.6,  # Moderately warm and supportive
+            'empathetic_support': 0.4,    # More measured and careful
+            'balanced_engagement': 0.7    # Balanced creativity
+        }
+        return temperature_map.get(strategy, 0.7)
+    
+    def _format_emotion_trend(self, emotion_trend: Dict[str, float]) -> str:
+        """Format emotion trend for prompt context"""
+        if not emotion_trend:
+            return "No previous emotional context"
+        
+        top_emotions = sorted(emotion_trend.items(), key=lambda x: x[1], reverse=True)[:3]
+        return ", ".join([f"{emotion}: {score:.2f}" for emotion, score in top_emotions])
+    
+    def _fallback_response(self, emotion_result: EmotionResult) -> str:
+        """Fallback response when OpenAI API fails"""
+        emotion = emotion_result.dominant_emotion
+        
+        fallback_responses = {
+            'joy': "I can sense your positive energy! That's wonderful to hear.",
+            'sadness': "I understand you might be feeling down. I'm here to listen.",
+            'anger': "I can tell you might be frustrated. Let's talk through this.",
+            'fear': "It sounds like you might be worried. That's completely understandable.",
+            'surprise': "That sounds unexpected! I'd love to hear more about it.",
+            'amusement': "I love that you're finding humor in things!",
+            'excitement': "Your enthusiasm comes through clearly!",
+            'contentment': "You seem to be in a peaceful place right now."
+        }
+        
+        return fallback_responses.get(emotion, "I'm here to chat with you and understand how you're feeling.")
         
         # Get top 3 emotions
         top_emotions = [f"{e[0]} ({e[1]:.2f})" for e in sorted_emotions[:3]]

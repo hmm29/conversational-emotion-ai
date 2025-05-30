@@ -1,103 +1,68 @@
 """
 Conversation Manager Module
 
-This module handles conversation state, history, and context management.
+This module handles generating contextually appropriate and emotionally aware responses
+using OpenAI's API with psychology-informed prompting.
 """
-from typing import Dict, List, Optional, TypedDict, Any
-from datetime import datetime
 import json
 import os
+from typing import Dict, List, Optional, Any, Tuple
+from dataclasses import dataclass, asdict
+from datetime import datetime, timedelta
+import logging
 from pathlib import Path
 
+from .emotion_analyzer import EmotionResult, EmotionHistory
+from .response_generator import ConversationContext, EmotionAwareResponseGenerator
 
-class Message(TypedDict):
-    """Represents a single message in the conversation."""
-    role: str  # 'user' or 'assistant'
-    content: str
-    timestamp: str
-    emotions: Optional[Dict[str, float]]
+logger = logging.getLogger(__name__)
 
+@dataclass
+class ConversationTurn:
+    """Single turn in conversation with metadata"""
+    user_message: str
+    bot_response: str
+    emotion_result: EmotionResult
+    timestamp: datetime
+    response_strategy: str
+    context_used: Dict[str, Any]
 
-class ConversationManager:
-    """Manages conversation state and history."""
+class PersonalityProfile:
+    """Track user personality traits over conversation"""
     
-    def __init__(self, conversation_id: Optional[str] = None, history_dir: str = 'data/conversation_history'):
-        """Initialize the conversation manager.
-        
-        Args:
-            conversation_id: Optional ID for the conversation. If not provided, a timestamp-based ID will be generated.
-            history_dir: Directory to store conversation history files.
-        """
-        self.messages: List[Message] = []
-        self.conversation_id = conversation_id or f"conv_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        self.history_dir = Path(history_dir)
-        self.history_dir.mkdir(parents=True, exist_ok=True)
-        self.emotion_history: List[Dict[str, float]] = []
-    
-    def add_message(self, role: str, content: str, emotions: Optional[Dict[str, float]] = None) -> None:
-        """Add a message to the conversation.
-        
-        Args:
-            role: The role of the message sender ('user' or 'assistant').
-            content: The text content of the message.
-            emotions: Optional dictionary of emotion scores for the message.
-        """
-        if role not in ['user', 'assistant']:
-            raise ValueError("Role must be either 'user' or 'assistant'")
-            
-        message: Message = {
-            'role': role,
-            'content': content,
-            'timestamp': datetime.now().isoformat(),
-            'emotions': emotions
+    def __init__(self):
+        self.traits = {
+            'openness': 0.5,           # Openness to experience
+            'emotional_expressivity': 0.5,  # How emotionally expressive
+            'humor_appreciation': 0.5,      # Response to humor
+            'support_seeking': 0.5,         # Tendency to seek support
+            'conversation_depth': 0.5       # Preference for deep vs shallow topics
         }
-        
-        self.messages.append(message)
-        
-        if role == 'user' and emotions:
-            self.emotion_history.append(emotions)
+        self.confidence = {trait: 0.1 for trait in self.traits}
+        self.update_count = 0
     
-    def get_conversation_history(self, max_messages: Optional[int] = None) -> List[Message]:
-        """Get the conversation history.
+    def update_from_emotion(self, emotion_result: EmotionResult, response_engagement: float):
+        """Update personality profile based on emotional expression and engagement"""
+        self.update_count += 1
+        learning_rate = min(0.1, 1.0 / self.update_count)  # Decreasing learning rate
         
-        Args:
-            max_messages: Maximum number of messages to return. If None, returns all messages.
-            
-        Returns:
-            List of message dictionaries.
-        """
-        if max_messages is None:
-            return self.messages
-        return self.messages[-max_messages:]
-    
-    def get_emotion_history(self) -> List[Dict[str, float]]:
-        """Get the emotion history for the conversation.
+        # Update emotional expressivity based on emotion confidence
+        if emotion_result.confidence > 0.6:
+            self.traits['emotional_expressivity'] += learning_rate * 0.2
         
-        Returns:
-            List of emotion dictionaries for user messages.
-        """
-        return self.emotion_history
-    
-    def save_conversation(self) -> str:
-        """Save the conversation to a JSON file.
+        # Update humor appreciation based on amusement
+        if emotion_result.emotions.get('amusement', 0) > 0.3:
+            self.traits['humor_appreciation'] += learning_rate * 0.3
         
-        Returns:
-            Path to the saved conversation file.
-        """
-        if not self.messages:
-            raise ValueError("No messages to save")
-            
-        filename = self.history_dir / f"{self.conversation_id}.json"
+        # Update support seeking based on negative emotions
+        negative_emotions = ['sadness', 'fear', 'anger', 'disappointment', 'shame']
+        negative_score = sum(emotion_result.emotions.get(e, 0) for e in negative_emotions)
+        if negative_score > 0.4:
+            self.traits['support_seeking'] += learning_rate * 0.2
         
-        with open(filename, 'w', encoding='utf-8') as f:
-            json.dump({
-                'conversation_id': self.conversation_id,
-                'created_at': self.messages[0]['timestamp'],
-                'messages': self.messages
-            }, f, indent=2)
-            
-        return str(filename)
-    
+        # Update conversation depth based on engagement with complex topics
+        if response_engagement > 0.7:
+            self.traits['conversation_depth'] += learning_rate * 0.1
     @classmethod
     def load_conversation(cls, filepath: str) -> 'ConversationManager':
         """Load a conversation from a JSON file.

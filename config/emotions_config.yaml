@@ -53,42 +53,42 @@ primary_emotions:
     intensity_threshold: 0.3
     
   - name: "disappointment"
-    description: "Feeling of letdown or dissatisfaction"
+    description: "Feeling of dissatisfaction or letdown"
     positive: false
-    intensity_threshold: 0.25
+    intensity_threshold: 0.3
     
   - name: "doubt"
-    description: "Uncertainty or lack of confidence"
-    positive: false
+    description: "Feeling of uncertainty or skepticism"
+    positive: null  # Can be neutral or negative depending on context
     intensity_threshold: 0.25
     
   - name: "enthusiasm"
-    description: "Great excitement and eagerness"
+    description: "Intense and eager enjoyment or interest"
     positive: true
     intensity_threshold: 0.3
     
   - name: "interest"
-    description: "Curiosity and engagement with a topic"
+    description: "Curiosity and desire to learn or know more"
     positive: true
-    intensity_threshold: 0.25
+    intensity_threshold: 0.3
     
   - name: "satisfaction"
-    description: "Contentment and fulfillment"
+    description: "Feeling of contentment and fulfillment"
     positive: true
     intensity_threshold: 0.3
     
   - name: "shame"
-    description: "Feeling of guilt or embarrassment"
+    description: "Feeling of guilt, regret, or embarrassment"
     positive: false
     intensity_threshold: 0.25
     
   - name: "sympathy"
-    description: "Sharing or understanding another's feelings"
+    description: "Feeling of compassion and understanding for others' misfortune"
     positive: true
     intensity_threshold: 0.3
     
   - name: "tiredness"
-    description: "Feeling of physical or mental exhaustion"
+    description: "Feeling of fatigue or lack of energy"
     positive: false
     intensity_threshold: 0.25
 
@@ -106,6 +106,26 @@ response_strategies:
     - "Avoid dismissing or minimizing the feeling"
     - "Offer support and understanding"
     - "Suggest constructive ways to cope when appropriate"
+
+  high_positive:
+    threshold: 0.7
+    emotions: [joy, excitement, amusement, enthusiasm]
+    approach: "amplify_positive"
+    
+  moderate_positive:
+    threshold: 0.4
+    emotions: [contentment, interest, satisfaction]
+    approach: "gentle_encouragement"
+    
+  negative:
+    threshold: 0.3
+    emotions: [sadness, anger, fear, disappointment, shame]
+    approach: "empathetic_support"
+    
+  neutral:
+    threshold: 0.2
+    emotions: [doubt, tiredness]
+    approach: "balanced_engagement"
 
 # Emotion-specific response guidance
 emotion_guidance:
