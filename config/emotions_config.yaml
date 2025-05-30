@@ -31,6 +31,66 @@ primary_emotions:
     description: "Feeling of revulsion or strong disapproval"
     positive: false
     intensity_threshold: 0.25
+    
+  - name: "contempt"
+    description: "Feeling of strong disapproval mixed with dislike and disrespect"
+    positive: false
+    intensity_threshold: 0.25
+    
+  - name: "excitement"
+    description: "Intense enthusiasm and eagerness"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "amusement"
+    description: "Feeling of being entertained or finding something funny"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "contentment"
+    description: "State of peaceful satisfaction and ease"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "disappointment"
+    description: "Feeling of letdown or dissatisfaction"
+    positive: false
+    intensity_threshold: 0.25
+    
+  - name: "doubt"
+    description: "Uncertainty or lack of confidence"
+    positive: false
+    intensity_threshold: 0.25
+    
+  - name: "enthusiasm"
+    description: "Great excitement and eagerness"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "interest"
+    description: "Curiosity and engagement with a topic"
+    positive: true
+    intensity_threshold: 0.25
+    
+  - name: "satisfaction"
+    description: "Contentment and fulfillment"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "shame"
+    description: "Feeling of guilt or embarrassment"
+    positive: false
+    intensity_threshold: 0.25
+    
+  - name: "sympathy"
+    description: "Sharing or understanding another's feelings"
+    positive: true
+    intensity_threshold: 0.3
+    
+  - name: "tiredness"
+    description: "Feeling of physical or mental exhaustion"
+    positive: false
+    intensity_threshold: 0.25
 
 # Emotion response strategies
 response_strategies:
