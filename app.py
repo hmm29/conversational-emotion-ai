@@ -70,11 +70,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-class ConversationApp:
-    """Enhanced Streamlit application with advanced conversation management"""
+class AdvancedConversationApp:
+    """Enhanced Streamlit application with advanced features"""
     
     def __init__(self):
         self.conversation_manager = None
+        self.visualizer = EmotionVisualizer()
         
         # Initialize session state
         if 'conversation_history' not in st.session_state:
@@ -83,6 +84,14 @@ class ConversationApp:
             st.session_state.analytics_data = {}
         if 'manager_initialized' not in st.session_state:
             st.session_state.manager_initialized = False
+        if 'real_time_mode' not in st.session_state:
+            st.session_state.real_time_mode = False
+        if 'conversation_settings' not in st.session_state:
+            st.session_state.conversation_settings = {
+                'response_style': 'balanced',
+                'emotion_sensitivity': 0.5,
+                'context_window': 5
+            }
     
     async def initialize_manager(self):
         """Initialize the conversation manager"""
@@ -97,59 +106,106 @@ class ConversationApp:
         return True
     
     def render_header(self):
-        """Render the main header"""
+        """Render enhanced header with status indicators"""
         st.markdown('<h1 class="main-header">🤖💭 Conversational AI with Emotion Analysis</h1>', 
                    unsafe_allow_html=True)
+        
+        # Status indicators
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            openai_status = "connected" if os.getenv("OPENAI_API_KEY") else "disconnected"
+            hume_status = "connected" if os.getenv("HUME_API_KEY") else "disconnected"
+            
+            st.markdown(f"""
+            <div style="text-align: center; margin: 1rem 0;">
+                <span class="status-indicator status-{openai_status}"></span>OpenAI
+                <span class="status-indicator status-{hume_status}" style="margin-left: 2rem;"></span>Hume AI
+                <span class="status-indicator {'status-connected' if st.session_state.manager_initialized else 'status-disconnected'}" style="margin-left: 2rem;"></span>System Ready
+            </div>
+            """, unsafe_allow_html=True)
         
         st.markdown("""
         **Experience next-generation conversational AI that understands and responds to emotions.**
         
         This advanced system combines real-time emotion analysis with sophisticated response generation,
-        creating truly empathetic and contextually-aware conversations.
+        creating truly empathetic and contextually-aware conversations powered by cutting-edge AI.
         """)
     
-    def render_sidebar(self):
-        """Enhanced sidebar with system status and controls"""
+    def render_advanced_sidebar(self):
+        """Enhanced sidebar with advanced controls"""
         with st.sidebar:
-            st.header("🎛️ System Status")
+            st.header("🎛️ Advanced Controls")
             
-            # API Status
-            openai_status = "✅ Connected" if os.getenv("OPENAI_API_KEY") else "❌ Not Connected"
-            hume_status = "✅ Connected" if os.getenv("HUME_API_KEY") else "❌ Not Connected"
-            
-            st.markdown(f"""
-            **OpenAI API:** {openai_status}  
-            **Hume AI API:** {hume_status}  
-            **Manager:** {"✅ Ready" if st.session_state.manager_initialized else "❌ Not Ready"}
-            """)
+            # System Status Section
+            st.subheader("📊 System Status")
+            if st.session_state.manager_initialized and self.conversation_manager:
+                analytics = self.conversation_manager.get_conversation_analytics()
+                if 'session_info' in analytics:
+                    session_info = analytics['session_info']
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Messages", session_info.get('total_turns', 0))
+                        st.metric("Avg Confidence", f"{session_info.get('avg_emotion_confidence', 0):.2f}")
+                    with col2:
+                        st.metric("Duration", f"{session_info.get('duration_minutes', 0):.1f}m")
+                        st.metric("Session ID", session_info.get('session_id', 'N/A')[-6:])
             
             st.markdown("---")
             
-            # Controls
-            st.subheader("🎮 Controls")
-            if st.button("🗑️ Clear Conversation"):
-                st.session_state.conversation_history = []
-                st.session_state.analytics_data = {}
-                if self.conversation_manager:
-                    self.conversation_manager.conversation_turns = []
-                    self.conversation_manager.emotion_history.history = []
-                st.rerun()
+            # Conversation Settings
+            st.subheader("⚙️ Conversation Settings")
             
-            if st.button("📊 Refresh Analytics"):
-                if self.conversation_manager:
-                    st.session_state.analytics_data = self.conversation_manager.get_conversation_analytics()
-                st.rerun()
+            st.session_state.conversation_settings['response_style'] = st.selectbox(
+                "Response Style",
+                ['empathetic', 'analytical', 'encouraging', 'balanced', 'humorous'],
+                index=3,
+                help="Choose the AI's conversational style"
+            )
             
-            # Quick Stats
-            if st.session_state.analytics_data:
-                st.subheader("📈 Quick Stats")
-                analytics = st.session_state.analytics_data
-                
-                if 'session_info' in analytics:
-                    session_info = analytics['session_info']
-                    st.metric("Total Exchanges", session_info.get('total_turns', 0))
-                    st.metric("Avg Confidence", f"{session_info.get('avg_emotion_confidence', 0):.2f}")
-                    st.metric("Duration (min)", session_info.get('duration_minutes', 0))
+            st.session_state.conversation_settings['emotion_sensitivity'] = st.slider(
+                "Emotion Sensitivity",
+                0.1, 1.0, 0.5, 0.1,
+                help="How sensitive the AI should be to emotional cues"
+            )
+            
+            st.session_state.conversation_settings['context_window'] = st.slider(
+                "Context Memory",
+                1, 10, 5,
+                help="How many previous messages to remember"
+            )
+            
+            # Real-time Features
+            st.subheader("🔄 Real-time Features")
+            st.session_state.real_time_mode = st.toggle(
+                "Real-time Emotion Tracking",
+                st.session_state.real_time_mode,
+                help="Enable continuous emotion monitoring"
+            )
+            
+            # Advanced Actions
+            st.subheader("🚀 Actions")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🗑️ Clear", use_container_width=True):
+                    st.session_state.conversation_history = []
+                    st.session_state.analytics_data = {}
+                    if self.conversation_manager:
+                        self.conversation_manager.conversation_turns = []
+                        self.conversation_manager.emotion_history.history = []
+                    st.rerun()
+            
+            with col2:
+                if st.button("📊 Refresh", use_container_width=True):
+                    if self.conversation_manager:
+                        st.session_state.analytics_data = self.conversation_manager.get_conversation_analytics()
+                    st.rerun()
+            
+            # Export conversation
+            if st.session_state.conversation_history:
+                if st.button("📥 Export Chat", use_container_width=True):
+                    self.export_conversation()
     
     async def process_user_input(self, user_input: str):
         """Process user input through the conversation manager"""
@@ -178,189 +234,235 @@ class ConversationApp:
         except Exception as e:
             st.error(f"Error processing message: {str(e)}")
     
-    def render_conversation(self):
-        """Render the enhanced conversation interface"""
-        st.subheader("💬 Conversation")
+    def render_enhanced_conversation(self):
+        """Render enhanced conversation interface"""
+        st.subheader("💬 Intelligent Conversation")
         
-        # Input area
-        col1, col2 = st.columns([4, 1])
+        # Enhanced input area
+        col1, col2, col3 = st.columns([6, 1, 1])
         
         with col1:
             user_input = st.text_input(
-                "Type your message:",
+                "Message",
                 key="user_input",
-                placeholder="How are you feeling today? Tell me what's on your mind..."
+                placeholder="Share your thoughts, feelings, or ask me anything...",
+                label_visibility="collapsed"
             )
         
         with col2:
-            send_button = st.button("Send", type="primary")
+            send_button = st.button("Send 🚀", type="primary", use_container_width=True)
+        
+        with col3:
+            voice_button = st.button("🎤", use_container_width=True, help="Voice input (coming soon)")
         
         if (send_button and user_input) or (user_input and st.session_state.get('enter_pressed')):
-            # Process the input
             asyncio.run(self.process_user_input(user_input))
             st.rerun()
         
-        # Display conversation history
+        # Enhanced conversation display
         if st.session_state.conversation_history:
-            st.markdown("### Recent Conversation")
+            st.markdown("### 💭 Conversation Flow")
             
+            # Show conversation in reverse order (most recent first)
             for i, exchange in enumerate(reversed(st.session_state.conversation_history[-10:])):
-                # User message
+                # User message with emotion analysis
+                emotion_indicator = "🟢" if exchange['confidence'] > 0.7 else "🟡" if exchange['confidence'] > 0.4 else "🔴"
+                
                 st.markdown(f"""
                 <div class="chat-message user-message">
                     <strong>You:</strong> {exchange['user']}
-                    <br><small>🎭 Detected: {exchange['emotion']} (confidence: {exchange['confidence']:.2f})</small>
+                    <br><small>{emotion_indicator} <strong>{exchange['emotion'].title()}</strong> 
+                    (confidence: {exchange['confidence']:.2f}) • 
+                    {datetime.fromisoformat(exchange['timestamp']).strftime('%H:%M:%S')}</small>
                 </div>
                 """, unsafe_allow_html=True)
                 
-                # Bot message
+                # Bot message with strategy info
+                strategy_used = st.session_state.analytics_data.get('strategy_distribution', {})
+                
                 st.markdown(f"""
                 <div class="chat-message bot-message">
                     <strong>AI Assistant:</strong> {exchange['bot']}
+                    <br><small>💡 Response generated with {exchange.get('settings_used', {}).get('response_style', 'balanced')} style</small>
                 </div>
                 """, unsafe_allow_html=True)
                 
                 if i < len(st.session_state.conversation_history) - 1:
-                    st.markdown("---")
+                    st.markdown("<hr style='margin: 0.5rem 0; opacity: 0.3;'>", unsafe_allow_html=True)
         else:
-            st.info("👋 Start a conversation! I'm here to listen and understand your emotions.")
+            st.markdown("""
+            <div class="analytics-card">
+                <h3>👋 Welcome to Advanced Conversational AI!</h3>
+                <p>I'm here to have meaningful conversations while understanding your emotions. 
+                Share your thoughts, feelings, or ask me anything - I'll adapt my responses based on your emotional state.</p>
+                <p><strong>Try saying:</strong></p>
+                <ul>
+                    <li>"I'm feeling excited about my new project!"</li>
+                    <li>"I'm worried about an upcoming presentation"</li>
+                    <li>"Tell me something interesting about AI"</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
     
-    def render_analytics_dashboard(self):
+    def render_advanced_analytics(self):
         """Render comprehensive analytics dashboard"""
         if not st.session_state.analytics_data:
-            st.info("Start a conversation to see detailed analytics!")
+            st.info("Start a conversation to see detailed analytics and visualizations!")
             return
         
         analytics = st.session_state.analytics_data
         
-        # Session Overview
+        # Key Metrics Row
         if 'session_info' in analytics:
             st.subheader("📋 Session Overview")
-            
-            col1, col2, col3, col4 = st.columns(4)
             session_info = analytics['session_info']
             
+            col1, col2, col3, col4 = st.columns(4)
+            
             with col1:
-                st.metric("Total Exchanges", session_info.get('total_turns', 0))
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>{session_info.get('total_turns', 0)}</h3>
+                    <p>Total Exchanges</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col2:
-                st.metric("Duration", f"{session_info.get('duration_minutes', 0):.1f} min")
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>{session_info.get('duration_minutes', 0):.1f}m</h3>
+                    <p>Duration</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col3:
-                st.metric("Avg Confidence", f"{session_info.get('avg_emotion_confidence', 0):.2f}")
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>{session_info.get('avg_emotion_confidence', 0):.2f}</h3>
+                    <p>Avg Confidence</p>
+                </div>
+                """, unsafe_allow_html=True)
+            
             with col4:
-                st.metric("Session ID", session_info.get('session_id', 'N/A')[-8:])
+                st.markdown(f"""
+                <div class="metric-card">
+                    <h3>{session_info.get('session_id', 'N/A')[-6:]}</h3>
+                    <p>Session ID</p>
+                </div>
+                """, unsafe_allow_html=True)
         
-        # Emotion Analysis
+        # Visualization Grid
         col1, col2 = st.columns(2)
         
         with col1:
-            if 'emotion_distribution' in analytics and analytics['emotion_distribution']:
-                st.subheader("🎭 Emotion Distribution")
-                
-                emotions_df = pd.DataFrame(
-                    list(analytics['emotion_distribution'].items()),
-                    columns=['Emotion', 'Count']
-                ).sort_values('Count', ascending=True)
-                
-                fig = px.bar(
-                    emotions_df,
-                    x='Count',
-                    y='Emotion',
-                    orientation='h',
-                    title="Emotions Throughout Conversation",
-                    color='Count',
-                    color_continuous_scale='viridis'
-                )
-                st.plotly_chart(fig, use_container_width=True)
+            # Current emotion radar
+            if st.session_state.conversation_history:
+                latest_emotions = st.session_state.conversation_history[-1].get('emotion_details', {})
+                if latest_emotions:
+                    radar_fig = self.visualizer.create_emotion_radar_chart(latest_emotions)
+                    st.plotly_chart(radar_fig, use_container_width=True)
+            
+            # Emotion timeline
+            timeline_fig = self.visualizer.create_emotion_timeline(st.session_state.conversation_history)
+            st.plotly_chart(timeline_fig, use_container_width=True)
         
         with col2:
-            if 'strategy_distribution' in analytics and analytics['strategy_distribution']:
-                st.subheader("🎯 Response Strategies")
-                
-                strategies_df = pd.DataFrame(
-                    list(analytics['strategy_distribution'].items()),
-                    columns=['Strategy', 'Count']
+            # Personality spider chart
+            if 'personality_profile' in analytics:
+                personality_fig = self.visualizer.create_personality_spider_chart(
+                    analytics['personality_profile']['traits']
                 )
-                
-                fig = px.pie(
-                    strategies_df,
-                    values='Count',
-                    names='Strategy',
-                    title="AI Response Strategies Used"
+                st.plotly_chart(personality_fig, use_container_width=True)
+            
+            # Response strategy pie chart
+            if 'strategy_distribution' in analytics:
+                strategy_fig = self.visualizer.create_response_strategy_pie(
+                    analytics['strategy_distribution']
                 )
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(strategy_fig, use_container_width=True)
         
-        # Personality Profile
-        if 'personality_profile' in analytics:
-            st.subheader("🧠 Personality Insights")
-            
-            profile = analytics['personality_profile']
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown("**Detected Traits:**")
-                traits_df = pd.DataFrame(
-                    list(profile['traits'].items()),
-                    columns=['Trait', 'Score']
-                )
-                
-                fig = px.bar(
-                    traits_df,
-                    x='Trait',
-                    y='Score',
-                    title="Personality Trait Analysis",
-                    color='Score',
-                    color_continuous_scale='blues'
-                )
-                fig.update_xaxis(tickangle=45)
-                st.plotly_chart(fig, use_container_width=True)
-            
-            with col2:
-                st.markdown("**Confidence Levels:**")
-                for trait, confidence in profile['confidence'].items():
-                    st.progress(confidence, text=f"{trait.replace('_', ' ').title()}: {confidence:.2f}")
-        
-        # Recent Emotional Trend
-        if 'recent_emotion_trend' in analytics and analytics['recent_emotion_trend']:
-            st.subheader("📈 Recent Emotional Trend")
-            
-            trend_df = pd.DataFrame(
-                list(analytics['recent_emotion_trend'].items()),
-                columns=['Emotion', 'Average_Score']
-            ).sort_values('Average_Score', ascending=False).head(8)
-            
-            fig = px.line(
-                trend_df,
-                x='Emotion',
-                y='Average_Score',
-                title="Emotional Trend (Recent Messages)",
-                markers=True
-            )
-            fig.update_xaxis(tickangle=45)
-            st.plotly_chart(fig, use_container_width=True)
+        # Full-width emotion heatmap
+        if len(st.session_state.conversation_history) > 3:
+            st.subheader("🔥 Emotion Intensity Heatmap")
+            heatmap_fig = self.visualizer.create_emotion_heatmap(st.session_state.conversation_history)
+            st.plotly_chart(heatmap_fig, use_container_width=True)
     
     async def run(self):
-        """Main application runner"""
+        """Main application runner with enhanced features"""
         # Initialize
         if not st.session_state.manager_initialized:
             await self.initialize_manager()
         
         # Render UI
         self.render_header()
-        self.render_sidebar()
+        self.render_advanced_sidebar()
         
-        # Main content tabs
-        tab1, tab2 = st.tabs(["💬 Chat", "📊 Analytics"])
+        # Main content with enhanced tabs
+        tab1, tab2, tab3 = st.tabs(["💬 Conversation", "📊 Analytics", "🔬 Research Mode"])
         
         with tab1:
-            self.render_conversation()
+            self.render_enhanced_conversation()
         
         with tab2:
-            self.render_analytics_dashboard()
+            self.render_advanced_analytics()
+        
+        with tab3:
+            self.render_research_mode()
+    
+    def render_research_mode(self):
+        """Render research and experimentation interface"""
+        st.subheader("🔬 Research & Experimentation")
+        
+        st.markdown("""
+        This mode allows you to experiment with different AI configurations and analyze the results.
+        Perfect for understanding how different settings affect conversation quality and emotional understanding.
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("### 🧪 Experiment Settings")
+            
+            # Experiment configuration
+            experiment_name = st.text_input("Experiment Name", "Emotion Sensitivity Test")
+            
+            sensitivity_values = st.multiselect(
+                "Test Emotion Sensitivity Values",
+                [0.1, 0.3, 0.5, 0.7, 0.9],
+                default=[0.3, 0.5, 0.7]
+            )
+            
+            response_styles = st.multiselect(
+                "Test Response Styles",
+                ['empathetic', 'analytical', 'encouraging', 'balanced', 'humorous'],
+                default=['empathetic', 'balanced']
+            )
+            
+            if st.button("🚀 Run Experiment"):
+                st.info("Experiment framework ready! This would test different configurations automatically.")
+        
+        with col2:
+            st.markdown("### 📈 Research Insights")
+            
+            if st.session_state.conversation_history:
+                # Calculate some basic research metrics
+                total_messages = len(st.session_state.conversation_history)
+                avg_confidence = sum(msg['confidence'] for msg in st.session_state.conversation_history) / total_messages
+                
+                st.metric("Sample Size", total_messages)
+                st.metric("Avg Emotion Confidence", f"{avg_confidence:.3f}")
+                
+                # Emotion distribution
+                emotions = [msg['emotion'] for msg in st.session_state.conversation_history]
+                emotion_counts = pd.Series(emotions).value_counts()
+                
+                st.markdown("**Emotion Distribution:**")
+                for emotion, count in emotion_counts.head().items():
+                    st.write(f"• {emotion.title()}: {count} ({count/total_messages*100:.1f}%)")
 
 # Run the app
 if __name__ == "__main__":
-    app = ConversationApp()
+    app = AdvancedConversationApp()
     asyncio.run(app.run())
 DEFAULT_TEMPERATURE = 0.7
 MAX_INPUT_LENGTH = 1000
