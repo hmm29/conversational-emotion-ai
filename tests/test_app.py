@@ -1,4 +1,6 @@
 """Runs the Streamlit app headlessly, offline, and sends it a message."""
+from pathlib import Path
+
 import pytest
 
 pytest.importorskip("streamlit")
@@ -7,13 +9,15 @@ from streamlit.testing.v1 import AppTest  # noqa: E402
 
 from src.response_generator import FALLBACK_REPLIES  # noqa: E402
 
+APP_PATH = str(Path(__file__).resolve().parent.parent / "app.py")
+
 
 @pytest.fixture()
 def app(monkeypatch):
     # Empty keys put the app in offline mode: keyword matcher and canned replies.
     monkeypatch.setenv("OPENAI_API_KEY", "")
     monkeypatch.setenv("HUME_API_KEY", "")
-    return AppTest.from_file("app.py", default_timeout=30)
+    return AppTest.from_file(APP_PATH, default_timeout=30)
 
 
 def test_app_starts_without_keys(app):
