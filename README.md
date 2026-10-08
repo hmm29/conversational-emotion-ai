@@ -1,190 +1,85 @@
 # Conversational Emotion AI
 
-An intelligent chatbot that analyzes emotional tone in real-time and adapts its responses based on detected emotions, combining psychology principles with advanced AI capabilities.
+[![tests](https://github.com/hmm29/conversational-emotion-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/hmm29/conversational-emotion-ai/actions/workflows/ci.yml)
 
-## 🌟 Key Features
+A Streamlit chatbot that reads the emotional tone of each message and adapts how it replies. Emotion scores come from Hume AI's language model, replies come from an OpenAI chat model, and the detected emotion decides which of four response approaches the model is prompted with.
 
-### Advanced AI Capabilities
-- **Real-time Emotion Detection**: Hume AI integration with fallback analysis
-- **Adaptive Response Generation**: OpenAI GPT-4 with emotion-aware prompting
-- **Personality Profiling**: Dynamic user personality learning over time
-- **Context Management**: Sophisticated conversation history and emotional context tracking
+It grew out of my Yale thesis work on human-computer interaction. It is a prototype for exploring emotion-aware conversation design, not a deployed product and not a mental-health tool.
 
-### Production-Ready Engineering
-- **Comprehensive Testing**: 95%+ test coverage with unit, integration, and performance tests
-- **Security Hardening**: API key encryption, input sanitization, rate limiting, and security headers
-- **Performance Optimization**: Advanced caching, batch processing, and resource monitoring
-- **Containerization**: Docker with health checks and monitoring
-- **Observability**: Real-time metrics, logging, and performance dashboards
+## What happens on each message
 
-### Interactive Visualizations
-- **Emotion Radar Charts**: Live emotional state visualization
-- **Conversation Timeline**: Emotional journey tracking
-- **Personality Spider Charts**: Dynamic trait analysis
-- **Performance Analytics**: System health and usage metrics
+1. **Analyze.** The text goes to Hume AI's Expression Measurement streaming API over a WebSocket. Scores are averaged across the returned predictions and the strongest emotion becomes the dominant one.
+2. **Choose an approach.** The dominant emotion maps to one of four approaches: amplify positive, gentle encouragement, empathetic support, or balanced engagement. The mapping lives in [`config/emotions_config.yaml`](config/emotions_config.yaml).
+3. **Reply.** The approach sets the system prompt and temperature for an OpenAI chat completion. The prompt also carries the detected emotion and the trend over the last five messages.
+4. **Show.** The app displays the reply, a radar chart of the message's emotions, a timeline across the conversation, the approaches used so far, and a simple heuristic profile of the conversation.
 
-### Professional UI/UX
-- **Gradient Designs**: Modern, professional interface
-- **Smooth Animations**: Enhanced user experience with CSS animations
-- **Status Indicators**: Real-time system status monitoring
-- **Responsive Layout**: Optimized for different screen sizes
+The conversation can be downloaded as JSON.
 
-### Research & Experimentation
-- **A/B Testing Framework**: Compare different AI configurations
-- **Performance Analytics**: Monitor system performance and response times
-- **Export Functionality**: Download conversation data for analysis
-- **Settings Optimization**: Fine-tune AI behavior for specific use cases
+## Runs without keys
 
-## 🏗️ Architecture
+Both API keys are optional, so you can try it immediately:
 
-```
-User Input → Emotion Analysis → Context Understanding → Response Generation
-↓
-Real-time Monitoring ← Performance Optimization
-↓
-Visualization Dashboard ← Analytics Engine
-```
+| Missing key | What the app uses instead |
+|---|---|
+| `HUME_API_KEY` | A keyword matcher covering nine emotions |
+| `OPENAI_API_KEY` | One canned reply per approach |
 
-### Technical Stack
-- **Frontend**: Streamlit with custom CSS and interactive visualizations
-- **Emotion Analysis**: Hume AI API with intelligent fallback systems
-- **Response Generation**: OpenAI GPT-4 with emotion-aware prompting
-- **Visualization**: Plotly for real-time charts and analytics
-- **Deployment**: Docker with multi-stage builds and health checks
-- **Monitoring**: Custom performance tracking and resource monitoring
+The same stand-ins take over for a single message if a Hume or OpenAI call fails, and the app labels those messages.
 
-### Key Technologies
-- Python 3.9+
-- Streamlit 1.20+
-- OpenAI API
-- Hume AI API
-- Redis (optional)
-- Plotly for visualizations
-- Docker for containerization
+## Run it
 
-## 📊 Analytics & Insights
+Python 3.10 or newer.
 
-The system provides comprehensive analytics including:
-- Emotion distribution analysis
-- Response strategy effectiveness
-- Conversation engagement metrics
-- Personality trait evolution
-- Performance benchmarks
-
-## 📊 Performance Benchmarks
-
-- **Response Time**: < 2 seconds average (including API calls)
-- **Memory Usage**: < 512MB average for typical conversations
-- **Throughput**: Supports 100+ concurrent conversations
-- **Uptime**: 99.9% with proper deployment and monitoring
-- **Cache Hit Rate**: >90% for repeated queries
-- **API Call Efficiency**: Optimized batch processing for multiple requests
-
-## 🤖 Advanced Features
-
-### Emotion-Aware Response Generation
-- **Adaptive Prompting**: System prompts change based on detected emotional state
-- **Context Preservation**: Maintains emotional context across conversation
-- **Strategy Selection**: Different response approaches for different emotional needs
-
-### Personality Tracking
-- **Dynamic Profiling**: Learns user personality traits over time
-- **Confidence Scoring**: Tracks reliability of personality assessments
-- **Conversation Adaptation**: Tailors responses to individual personality
-
-### Analytics Dashboard
-- **Real-time Metrics**: Emotion distribution, response strategies, engagement
-- **Trend Analysis**: Emotional patterns over conversation
-- **Session Insights**: Comprehensive conversation analytics
-
-## 📈 Strategic Value
-
-This project demonstrates:
-
-- **Multimodal AI Integration**: Combining text analysis with emotion detection to create more empathetic interactions
-- **Real-time Processing**: Live emotion analysis and response generation for natural, fluid conversations
-- **Human-Centered Design**: Psychology-informed conversation strategies that adapt to user emotions
-- **Production-Ready Code**: Comprehensive error handling, fallback mechanisms, and robust testing
-- **Scalable Architecture**: Modular design that allows for easy extension and maintenance
-- **Data-Driven Insights**: Detailed emotion tracking and visualization for understanding conversation patterns
-
-## 📁 Project Structure
-
-```
-conversational-emotion-ai/
-├── src/
-│   ├── emotion_analyzer.py    # Emotion detection and analysis
-│   ├── conversation_manager.py # Conversation history and context
-│   ├── response_generator.py   # AI response generation
-│   ├── visualization.py        # Interactive visualizations
-│   ├── performance.py          # Performance monitoring
-│   └── optimization.py         # Performance optimization
-├── tests/
-│   ├── test_complete_system.py # Comprehensive test suite
-│   └── ...
-├── docs/
-│   ├── DEPLOYMENT.md          # Deployment guide
-│   └── API.md                 # API documentation
-├── security/
-│   └── security_config.py     # Security configurations
-├── config/
-│   └── emotions_config.yaml   # Emotion analysis configuration
-├── app.py                     # Main Streamlit application
-├── Dockerfile                 # Container configuration
-├── docker-compose.yml         # Multi-service deployment
-└── requirements.txt           # Python dependencies
-```
-
-## 🚀 Quick Start
-
-### Using Docker (Recommended)
 ```bash
-# Clone and run
 git clone https://github.com/hmm29/conversational-emotion-ai.git
 cd conversational-emotion-ai
-cp .env.example .env
-
-# Add your API keys to .env
-docker-compose up -d
-```
-
-### Local Development
-```bash
-# Setup
-python -m venv venv
-source venv/bin/activate
+python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
-# Configure
-cp .env.example .env
-
-# Edit .env with your API keys
+cp .env.example .env        # optional: add your keys
 streamlit run app.py
 ```
 
-## 🤝 Contributing
+Or with Docker, after creating `.env`:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes with tests
-4. Commit your changes (`git commit -m 'Add amazing feature'`)
-5. Push to the branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
+```bash
+docker compose up --build
+```
 
-## 📄 License
+Then open `http://localhost:8501`.
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+## Layout
 
-## 🙏 Acknowledgments
+```
+app.py                       Streamlit interface
+src/
+  emotion_analyzer.py        Hume client, keyword matcher, emotion history
+  response_generator.py      approach selection, prompts, OpenAI call
+  conversation_manager.py    turns, trend, profile, JSON export
+  visualization.py           Plotly charts
+config/emotions_config.yaml  emotion-to-approach mapping
+tests/                       unit tests and a headless run of the app
+```
 
-- Built with insights from modern AI research
-- Inspired by advances in emotional AI and human-computer interaction
-- Designed for modern AI engineering best practices
+More detail in [docs/architecture.md](docs/architecture.md).
 
-## 📢 Support
+## Tests
 
-For support, please:
-- Open an issue on GitHub
-- Check the documentation
-- Review the deployment guide
-- Join the discussion in the issues section
+```bash
+pip install -r requirements-dev.txt
+pytest -q
+```
+
+The tests run offline. They cover the keyword matcher, parsing of Hume responses, fallback behavior, approach selection, prompt construction, conversation state, the charts, and a headless run of the Streamlit app that sends a message. The WebSocket client is exercised against a local server that answers in Hume's documented response shape. No test calls Hume or OpenAI.
+
+## Limitations
+
+- Emotion scores describe the language of a message, not what a person actually feels.
+- The emotion-to-approach mapping and the 0.1 minimum score are starting points. They have not been calibrated or evaluated against labeled conversations.
+- The conversation profile is a set of simple running heuristics, not a personality assessment.
+- State lives in the browser session. There are no accounts, no database and no authentication.
+- Each message opens a new WebSocket to Hume, which adds connection time to every reply.
+
+## License
+
+MIT

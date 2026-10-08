@@ -1,153 +1,99 @@
-"""
-Tests for the ResponseGenerator class.
-"""
-import os
-import sys
-import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
-import openai
 from pathlib import Path
 
-# Add the src directory to the Python path
-sys.path.append(str(Path(__file__).parent.parent / 'src'))
+from src.emotion_analyzer import keyword_emotions
+from src.response_generator import (
+    APPROACH_PROMPTS,
+    BALANCED,
+    DEFAULT_STRATEGIES,
+    FALLBACK_REPLIES,
+    ConversationContext,
+    EmotionAwareResponseGenerator,
+    build_messages,
+    build_system_prompt,
+    choose_approach,
+    format_trend,
+    load_strategies,
+)
+from tests.fakes import FakeOpenAI
 
-from response_generator import ResponseGenerator
 
-# Sample API responses for testing
-SAMPLE_OPENAI_RESPONSE = {
-    "choices": [
-        {
-            "message": {
-                "role": "assistant",
-                "content": "I'm doing well, thank you for asking! How can I assist you today?"
-            }
-        }
-    ]
-}
-
-@pytest.fixture
-def mock_openai_response():
-    """Mock the OpenAI API response."""
-    with patch('openai.ChatCompletion.acreate') as mock_acreate:
-        mock_acreate.return_value = SAMPLE_OPENAI_RESPONSE
-        yield mock_acreate
-
-@pytest.fixture
-def response_generator():
-    """Create a ResponseGenerator instance for testing."""
-    return ResponseGenerator(api_key="test_api_key")
-
-def test_build_system_prompt_no_emotion(response_generator):
-    """Test building a system prompt with no emotion context."""
-    prompt = response_generator._build_system_prompt()
-    assert "emotionally intelligent" in prompt.lower()
-    assert "emotion" in prompt.lower()
-
-def test_build_system_prompt_with_emotion(response_generator):
-    """Test building a system prompt with emotion context."""
-    emotion_context = {"joy": 0.8, "sadness": 0.1, "anger": 0.05}
-    prompt = response_generator._build_system_prompt(emotion_context)
-    
-    # Should include emotion information
-    assert "joy (0.80)" in prompt
-    assert "sadness (0.10)" in prompt
-    assert "anger (0.05)" in prompt
-    
-    # Should include guidance for handling emotions
-    assert "consider these emotions" in prompt.lower()
-
-@pytest.mark.asyncio
-async def test_generate_response_success(response_generator, mock_openai_response):
-    """Test successful response generation."""
-    messages = [
-        {"role": "user", "content": "Hello, how are you?"}
-    ]
-    
-    response = await response_generator.generate_response(
-        messages=messages,
-        emotion_context={"joy": 0.7},
-        temperature=0.7,
-        max_tokens=100
+def context_for(text, history=None, trend=None):
+    return ConversationContext(
+        user_message=text,
+        emotion_result=keyword_emotions(text),
+        conversation_history=history or [],
+        emotion_trend=trend or {},
     )
-    
-    assert response == SAMPLE_OPENAI_RESPONSE["choices"][0]["message"]["content"]
-    
-    # Verify the API was called with the correct parameters
-    mock_openai_response.assert_called_once()
-    args, kwargs = mock_openai_response.call_args
-    
-    assert kwargs["model"] == response_generator.model
-    assert kwargs["temperature"] == 0.7
-    assert kwargs["max_tokens"] == 100
-    
-    # Check that the system prompt was included
-    messages_passed = kwargs["messages"]
-    assert messages_passed[0]["role"] == "system"
-    assert "emotionally intelligent" in messages_passed[0]["content"]
-    assert messages_passed[1] == messages[0]
 
-@pytest.mark.asyncio
-async def test_generate_response_api_error(response_generator):
-    """Test handling of API errors during response generation."""
-    with patch('openai.ChatCompletion.acreate') as mock_acreate:
-        # Configure the mock to raise an exception
-        mock_acreate.side_effect = Exception("API Error")
-        
-        # This should not raise an exception but return a fallback response
-        response = await response_generator.generate_response(
-            messages=[{"role": "user", "content": "Hello"}],
-            emotion_context={"joy": 0.5}
-        )
-        
-        assert isinstance(response, str)
-        assert "trouble generating" in response.lower()
 
-def test_format_messages_for_api(response_generator):
-    """Test formatting conversation history for the OpenAI API."""
-    conversation_history = [
-        {"role": "user", "content": "Hello", "timestamp": "2023-01-01T00:00:00"},
-        {"role": "assistant", "content": "Hi there!", "timestamp": "2023-01-01T00:00:01"},
-        {"role": "system", "content": "You are helpful", "timestamp": "2023-01-01T00:00:00"},
-        {"role": "user", "content": "How are you?", "timestamp": "2023-01-01T00:00:02"}
-    ]
-    
-    formatted = response_generator.format_messages_for_api(conversation_history)
-    
-    # Should exclude system messages and only include role and content
-    assert len(formatted) == 3  # 2 user + 1 assistant messages
-    assert all(set(msg.keys()) == {'role', 'content'} for msg in formatted)
-    assert formatted[0]["content"] == "Hello"
-    assert formatted[1]["content"] == "Hi there!"
-    assert formatted[2]["content"] == "How are you?"
+def test_repo_config_loads_and_is_valid():
+    strategies = load_strategies()
+    assert strategies
+    for strategy in strategies.values():
+        assert strategy["approach"] in APPROACH_PROMPTS
+        assert strategy["emotions"]
 
-def test_format_messages_limit_history(response_generator):
-    """Test that message history can be limited."""
-    # Create a long conversation history
-    conversation_history = [
-        {"role": "user" if i % 2 == 0 else "assistant", "content": f"Message {i}"}
-        for i in range(20)  # 20 messages total
-    ]
-    
-    # Limit to 5 messages
-    formatted = response_generator.format_messages_for_api(
-        conversation_history,
-        max_history=5
-    )
-    
-    # Should only include the most recent 5 messages
-    assert len(formatted) == 5
-    assert formatted[0]["content"] == "Message 15"
-    assert formatted[-1]["content"] == "Message 19"
 
-def test_response_generator_init_no_api_key():
-    """Test that ResponseGenerator raises an error if no API key is provided."""
-    # Save and clear the environment variable if it exists
-    saved_key = os.environ.pop("OPENAI_API_KEY", None)
-    
-    try:
-        with pytest.raises(ValueError, match="OpenAI API key not provided"):
-            ResponseGenerator(api_key=None)
-    finally:
-        # Restore the environment variable
-        if saved_key is not None:
-            os.environ["OPENAI_API_KEY"] = saved_key
+def test_missing_config_falls_back_to_defaults():
+    assert load_strategies(Path("does/not/exist.yaml")) == DEFAULT_STRATEGIES
+
+
+def test_choose_approach_by_dominant_emotion():
+    assert choose_approach(keyword_emotions("I am so happy"), DEFAULT_STRATEGIES) == "amplify_positive"
+    assert choose_approach(keyword_emotions("I feel sad and lonely"), DEFAULT_STRATEGIES) == "empathetic_support"
+    assert choose_approach(keyword_emotions("wow"), DEFAULT_STRATEGIES) == BALANCED  # surprise is unlisted
+    assert choose_approach(keyword_emotions("the report is due Friday"), DEFAULT_STRATEGIES) == BALANCED
+
+
+def test_system_prompt_carries_approach_and_emotion():
+    context = context_for("I am furious", trend={"anger": 0.4, "joy": 0.0})
+    prompt = build_system_prompt("empathetic_support", context)
+    assert APPROACH_PROMPTS["empathetic_support"] in prompt
+    assert "anger" in prompt
+    assert "anger 0.40" in prompt
+
+
+def test_format_trend_with_no_history():
+    assert format_trend({}) == "no earlier messages"
+
+
+def test_messages_include_recent_history_only():
+    history = [{"user": f"u{i}", "bot": f"b{i}"} for i in range(10)]
+    messages = build_messages(context_for("latest", history=history), "SYSTEM", max_turns=2)
+    assert [m["content"] for m in messages] == ["SYSTEM", "u8", "b8", "u9", "b9", "latest"]
+    assert [m["role"] for m in messages] == ["system", "user", "assistant", "user", "assistant", "user"]
+
+
+def test_generate_uses_the_model_reply():
+    client = FakeOpenAI(reply="  That is wonderful news!  ")
+    generator = EmotionAwareResponseGenerator(client=client, model="test-model", strategies=DEFAULT_STRATEGIES)
+
+    response = generator.generate_response(context_for("I am so happy"))
+
+    assert response.text == "That is wonderful news!"
+    assert response.approach == "amplify_positive"
+    assert response.used_fallback is False
+    request = client.requests[0]
+    assert request["model"] == "test-model"
+    assert request["temperature"] == 0.8
+    assert request["messages"][-1] == {"role": "user", "content": "I am so happy"}
+
+
+def test_generate_falls_back_when_the_model_call_fails():
+    generator = EmotionAwareResponseGenerator(client=FakeOpenAI(error=RuntimeError("rate limited")), strategies=DEFAULT_STRATEGIES)
+    response = generator.generate_response(context_for("I feel sad"))
+    assert response.used_fallback is True
+    assert response.text == FALLBACK_REPLIES["empathetic_support"]
+
+
+def test_generate_falls_back_on_an_empty_reply():
+    generator = EmotionAwareResponseGenerator(client=FakeOpenAI(reply="   "), strategies=DEFAULT_STRATEGIES)
+    assert generator.generate_response(context_for("hello")).used_fallback is True
+
+
+def test_generate_without_a_client_uses_canned_replies():
+    generator = EmotionAwareResponseGenerator(strategies=DEFAULT_STRATEGIES)
+    assert generator.has_model is False
+    response = generator.generate_response(context_for("hello there"))
+    assert response.used_fallback is True
+    assert response.text == FALLBACK_REPLIES[BALANCED]
