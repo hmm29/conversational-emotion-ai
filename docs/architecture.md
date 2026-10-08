@@ -1,157 +1,50 @@
-# System Architecture
+# Architecture
 
-## Overview
-The Conversational Emotion AI is a sophisticated enterprise-grade application that combines advanced natural language processing with emotion analysis to create empathetic and context-aware conversations. The architecture is designed to be modular, scalable, and maintainable.
+This document describes what the code does today.
 
-## High-Level Architecture
-```mermaid
-graph TD
-    A[User] -->|Text Input| B[Streamlit UI]
-    B --> C[Conversation Manager]
-    C --> D[Emotion Analyzer]
-    D -->|Emotion Data| C
-    C --> E[Response Generator]
-    E -->|Generated Response| C
-    C --> B
-    B -->|Display Response| A
-    
-    subgraph External Services
-        D -->|API Call| F[Hume AI]
-        E -->|API Call| G[OpenAI]
-    end
-    
-    subgraph Internal Services
-        C --> H[Performance Monitor]
-        H -->|Metrics| I[Observability]
-        C --> J[Cache Manager]
-        J -->|Cached Data| C
-    end
-````
+## Flow
 
-## Core Components
+```
+app.py (Streamlit)
+  │  user message
+  ▼
+ConversationManager.process_message
+  ├─ analyzer.analyze_emotion        → EmotionResult
+  │     HumeEmotionAnalyzer            WebSocket to Hume's streaming API
+  │     └─ on any failure: keyword_emotions
+  │     KeywordEmotionAnalyzer         used when no Hume key is set
+  ├─ EmotionHistory.get_emotion_trend  average of the last five results
+  ├─ generator.generate_response     → GeneratedResponse
+  │     choose_approach                dominant emotion → approach
+  │     build_system_prompt            approach + emotion + trend
+  │     OpenAI chat completion
+  │     └─ on any failure, or no key: canned reply for the approach
+  ├─ PersonalityProfile.update
+  └─ append ConversationTurn
+```
 
-### 1. Emotion Analyzer
+## Components
 
-**Responsibilities**:
-- Interface with Hume AI's emotion analysis API
-- Process text to extract emotional tone
-- Normalize and structure emotion data
-- Handle API errors and rate limiting
+| Component | File | Notes |
+|---|---|---|
+| Hume client | `src/emotion_analyzer.py` | Sends `{"models": {"language": {}}, "raw_text": true, "data": text}` to `wss://api.hume.ai/v0/stream/models`, authenticated with the `X-Hume-Api-Key` header. Text is cut to Hume's 10,000-character limit. Scores are averaged over the returned predictions. |
+| Keyword matcher | `src/emotion_analyzer.py` | Whole-word matches against nine short keyword lists, 0.3 per match, capped at 1.0. No matches means "neutral". |
+| Approach selection | `src/response_generator.py` | Looks the dominant emotion up in `config/emotions_config.yaml`. Unlisted emotions and scores under 0.1 get balanced engagement. |
+| Prompts | `src/response_generator.py` | One base prompt, one paragraph per approach, plus the detected emotion and trend. The last six turns are sent as history. |
+| Conversation state | `src/conversation_manager.py` | Turns, a ten-result emotion history, approach counts, summary and JSON export. |
+| Profile | `src/conversation_manager.py` | Four values between 0 and 1, nudged by simple rules (emotion strength, amusement, negative emotion, message length). |
+| Charts | `src/visualization.py` | Functions that take data and return Plotly figures. |
 
-**Key Classes**:
-- `EmotionAnalyzer`: Main class for emotion analysis operations
+## Design choices
 
-**Dependencies**:
-- Hume AI API
-- `httpx` for async HTTP requests
+- **Dependencies passed in.** The analyzer takes its connect function and the generator takes its client, so tests replace Hume and OpenAI with in-memory fakes.
+- **Degrade, don't stall.** A failed external call falls back for that one message and is labeled in the interface.
+- **Synchronous code.** One message is processed at a time per browser session, so plain blocking calls are simpler than an event loop inside Streamlit.
+- **Charts separate from Streamlit.** The figure builders can be tested without a running app.
 
-### 2. Conversation Manager
+## Not built
 
-**Responsibilities**:
-- Maintain conversation state and history
-- Manage message storage and retrieval
-- Handle conversation persistence
-- Track emotion history
-
-**Key Classes**:
-- `ConversationManager`: Manages conversation state
-- `Message`: Data class for message representation
-
-**Dependencies**:
-- Redis (optional) for persistent storage
-- SQLite (optional) for local storage
-
-### 3. Response Generator
-
-**Responsibilities**:
-- Generate appropriate responses based on conversation context and emotions
-- Maintain personality consistency
-- Handle conversation branching
-- Manage response formatting
-
-**Key Classes**:
-- `ResponseGenerator`: Main class for response generation
-- `PersonalityProfile`: Manages AI personality traits
-
-**Dependencies**:
-- OpenAI GPT-4 API
-- `httpx` for async HTTP requests
-
-### 4. Web Interface (Streamlit)
-
-**Responsibilities**:
-- Provide user-friendly chat interface
-- Display conversation history
-- Visualize emotion analysis
-- Handle user input
-
-**Key Files**:
-- `app.py`: Main application entry point
-
-**Dependencies**:
-- Streamlit
-- Plotly for visualizations
-
-## Data Flow
-
-1. **User Input**:
-   - User enters text in the Streamlit interface
-   - Message is sent to the Conversation Manager
-
-2. **Emotion Analysis**:
-   - Conversation Manager sends text to Emotion Analyzer
-   - Emotion Analyzer processes text through Hume AI API
-   - Emotion data is returned and stored with the message
-
-3. **Response Generation**:
-   - Conversation history and emotion data are sent to Response Generator
-   - Response Generator formulates appropriate prompt for OpenAI
-   - Generated response is returned to Conversation Manager
-
-4. **Response Display**:
-   - Response is added to conversation history
-   - Updated conversation is displayed to user
-   - Emotion data is visualized (if applicable)
-
-## Configuration
-
-The system is configured through multiple mechanisms:
-
-1. **Environment Variables** (`.env`):
-   - API keys
-   - Service endpoints
-   - Runtime settings
-
-2. **YAML Configuration** (`config/emotions_config.yaml`):
-   - Emotion detection thresholds
-   - Response strategies
-   - Model parameters
-
-## Error Handling
-
-- **API Errors**: Graceful degradation when external services are unavailable
-- **Input Validation**: Comprehensive validation of all inputs
-- **Rate Limiting**: Backoff and retry logic for API calls
-- **Logging**: Structured logging for debugging and monitoring
-
-## Security Considerations
-
-- API keys are never stored in version control
-- Environment variables are used for sensitive configuration
-- Input sanitization to prevent injection attacks
-- Rate limiting to prevent abuse
-
-## Performance Considerations
-
-- Asynchronous API calls to prevent blocking
-- Caching of common responses
-- Efficient data structures for conversation history
-- Batch processing where applicable
-
-## Future Extensions
-
-1. **Multi-modal Input**: Support for voice and image analysis
-2. **Custom Models**: Fine-tuned models for specific domains
-3. **Plugins**: Extensible architecture for additional features
-4. **Analytics Dashboard**: Detailed conversation analytics
-5. **Multi-language Support**: Support for non-English languages
+- Evaluation of whether the adapted replies are better than unadapted ones
+- Calibrated thresholds per emotion
+- Persistent storage, accounts or authentication
+- Voice or facial expression input
